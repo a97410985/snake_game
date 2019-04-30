@@ -1,0 +1,8 @@
+{
+  "name": "snake_game_v2",
+  "version": "1.0.0",
+  "dependencies": {
+    "socket.io": "latest",
+    "express": "latest"
+  }
+}

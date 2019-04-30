@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<h1 id="gameState">Hello world</h1>
+<h3 id="my-id"></h3>
+<canvas id="myCanvas" style="border: #216eff 2px solid" width="0" height="0"></canvas>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+<script>
+    var objLeng = 20;
+    function clearAndDrawRects(snakesPos, rectColor) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < snakesPos.length; i++) {
+            ctx.fillStyle = rectColor[i];
+            for (let j = 0; j < snakesPos[i].rectX.length; j++) {
+                ctx.fillRect(snakesPos[i].rectX[j], snakesPos[i].rectY[j], 20, 20);
+            }
+        }
+    }
+    function drawFood(foodX, foodY) {
+        ctx.fillStyle = "#ff9629";
+        ctx.fillRect(foodX, foodY, objLeng, objLeng);
+    }
+
+    function snakeRestart() {
+        clearInterval(myTimer);
+        myTimer = setInterval(function () {
+            if (!deadTF) {
+                if (direction !== "none") {
+                    socket.emit("rect move", {id: my_id, direction: direction});
+                }
+            }
+        },moveInterval);
+    }
+
+    var socket = io();
+    var my_id = "";
+    var canvas = document.getElementById('myCanvas');
+    var ctx = canvas.getContext('2d');
+    var deadTF = false;
+    var myLength = 1;
+    socket.on('new player', function (data) {
+        var myCanvasCtx =  $("#myCanvas")[0].getContext('2d');
+        myCanvasCtx.canvas.width = data.canvasWid;
+        myCanvasCtx.canvas.height = data.canvasHgt;
+        clearAndDrawRects(data.snakesPos, data.rectColor);
+        drawFood(data.foodX,data.foodY);
+    });
+    socket.on("player exit", function (data) {
+        console.log("player exit");
+        clearAndDrawRects(data.snakesPos, data.rectColor);
+    });
+
+    socket.on('init', function (data) {
+        $('#my-id').text("my id : " + data.id);
+        drawFood(data.foodX,data.foodY);
+        my_id = data.id;
+    });
+    socket.on("rect move", function (data) {
+        //console.log(data);
+        clearAndDrawRects(data.snakesPos,data.rectColor);
+        drawFood(data.foodX, data.foodY);
+    });
+    socket.on("you dead", function (data) {
+        deadTF = true;
+        clearAndDrawRects(data.snakesPos,data.rectColor);
+        $("#gameState").text("GAME OVER");
+    });
+    socket.on("your length",function (data) {
+        myLength = data.snakeLeng;
+    });
+    var direction = "none";
+    var moveInterval = 1000;
+    var myTimer = setInterval(function () {
+        if (!deadTF) {
+            if (direction !== "none") {
+                socket.emit("rect move", {id: my_id, direction: direction});
+            }
+        }
+    },moveInterval);
+    var changeSpeedTimer = setInterval(function () {
+        if (moveInterval > 700){
+            moveInterval -= 100;
+            clearInterval(myTimer);
+            myTimer = setInterval(function () {
+                if (!deadTF) {
+                    if (direction !== "none") {
+                        socket.emit("rect move", {id: my_id, direction: direction});
+                    }
+                }
+            },moveInterval);
+        }
+        console.log(moveInterval);
+    },1000);
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "ArrowRight") {
+            //console.log("arrow right");
+            if (myLength === 1 || (direction !== "left" && myLength>1)){
+                snakeRestart();
+                direction = "right";
+                socket.emit("rect move", {id: my_id, direction: direction});
+            }
+        } else if (event.key === "ArrowUp" ) {
+            //console.log("arrow up");
+            if (myLength === 1 || (direction !== "down" && myLength>1)) {
+                snakeRestart();
+                direction = "up";
+                socket.emit("rect move", {id: my_id, direction: direction});
+            }
+
+        } else if (event.key === "ArrowDown") {
+            //console.log("arrow down");
+            if (myLength === 1 || (direction !== "up" && myLength>1)){
+                snakeRestart();
+                direction = "down";
+                socket.emit("rect move", {id: my_id, direction: direction});
+            }
+
+        } else if (event.key === "ArrowLeft") {
+            //console.log("arrow left");
+            if (myLength === 1 || (direction !== "right" && myLength>1)){
+                snakeRestart();
+                direction = "left";
+                socket.emit("rect move", {id: my_id, direction: direction});
+            }
+
+        }
+    })
+</script>
+</body>
+</html>
