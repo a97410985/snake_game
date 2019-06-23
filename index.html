@@ -2,28 +2,484 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>多人連線貪吃蛇遊戲</title>
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+    <style type="text/css">
+        /*  如果想要沒有關閉視窗的按鈕 */
+        .no-close .ui-dialog-titlebar-close {
+            display: none
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        /* hidden close button*/
+        /* 房間清單 */
+        #CreateRoomPanel {
+            display: none;
+        }
+
+        #roomPanel {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+        }
+
+        #roomPanel table {
+            background: #e9e9e9;
+        }
+
+        tr:nth-child(2n+2) {
+            background: #f8f6ff;
+        }
+
+        tr:nth-child(2n+3) {
+            background: white;
+        }
+
+        tr {
+            font-family: Lato-Regular, serif;
+            font-size: 19px;
+            color: #808080;
+            line-height: 1.4;
+        }
+
+        tr:first-child {
+            background: #6c7ae0;
+            color: white;
+            font-family: Lato-Bold, serif;
+            font-size: 21px;
+            line-height: 1.4;
+            font-weight: bold;
+            border: black solid 1px;
+        }
+
+        #roomTable tr td {
+            padding: 18px 40px 18px 40px;
+        }
+
+
+        /* for chat 在右下角*/
+        #chatPanel {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            border: 2px solid black;
+            width: fit-content;
+        }
+
+        form {
+            background: #000000;
+            padding: 3px;
+            right: 0;
+            bottom: 0;
+            width: 504px;
+        }
+
+        form input {
+            border: 0;
+            padding: 10px;
+            width: 80%;
+            margin-right: .5%;
+        }
+
+        form button {
+            width: 18%;
+            background: rgb(130, 224, 255);
+            border: none;
+            padding: 10px
+        }
+
+        #messages {
+            overflow: scroll;
+            position: relative;
+            display: inline-block;
+            width: 300px;
+            height: 200px;
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        #messages div {
+            padding: 5px 10px;
+        }
+
+        #messages div:nth-child(odd) {
+            background: #eeeeee;
+        }
+
+        #systemMsg {
+            display: inline-block;
+            vertical-align: top;
+            width: 200px;
+            height: 200px;
+            overflow: auto;
+            margin: 0;
+            padding: 0;
+        }
+
+        #systemMsg li {
+            padding: 5px 10px;
+        }
+
+        #systemMsg li:nth-child(odd) {
+            background: #ffd16e;
+        }
+
+        /*  在右上角，顯示方間相關資訊 */
+        #curRoomInfoPanel {
+            position: fixed;
+            right: 0;
+            width: 300px;
+            height: 400px;
+            background: #cfcfcf;
+        }
+
+        #curRoomInfoPanel > div, #curRoomInfoPanel > button {
+            margin: 6px;
+        }
+    </style>
 </head>
 <body>
-<h1 id="gameState">Hello world</h1>
-<h3 id="my-id"></h3>
+
+
+<!--右下角-->
+<div id="chatPanel" style="display: none">
+    <div id="messages"></div>
+    <ul id="systemMsg"></ul>
+    <form action="" id="sendForm">
+        <input id="m" autocomplete="off">
+        <button>send</button>
+        </input>
+    </form>
+</div>
+
+<!--房間列表、大廳-->
+<div id="roomPanel" style="display: flex">
+    <div>
+        <table id="roomTable">
+            <tr>
+                <td>房間名稱</td>
+                <td>房間最多人數</td>
+                <td>房間目前人數</td>
+                <td>加入</td>
+            </tr>
+        </table>
+        <div style="display: flex; flex-direction: row; justify-content: flex-end">
+            <button id="openCreateRoomPanelBtn">建立房間</button>
+        </div>
+    </div>
+</div>
+
+<!--右上角，房間相關資訊-->
+<div id="curRoomInfoPanel" style="display: none">
+    <div id="curRoomName">房間名稱 :</div>
+    <div id="curRoomPeopleNum">目前房間人數 :</div>
+    <ul id="snakeColorAndNickName" style="padding: 5px; margin: 3px"></ul>
+    <button onclick="leaveRoom()">離開房間</button>
+    <button id="reviveBtn" disabled="disabled" onclick="revive()">復活</button>
+</div>
+
+<!--貪吃蛇的畫布-->
 <canvas id="myCanvas" style="border: #216eff 2px solid" width="0" height="0"></canvas>
+
+
+<!--建立房間的面板-->
+<div id="CreateRoomPanel" style="display: none">
+    <p>請輸入房間名稱:<input id="roomNameInput" type="text"></p>
+    <p>房間的人數:<input id="roomCapacityInput" type="number" min="1" max="7" value="4" style="width: 50px"></p>
+    <p>場地大小: </p>
+    <p>&nbsp;&nbsp;&nbsp;幾個貪吃蛇寬&nbsp;&nbsp;<input id="roomWidInput" type="number" min="20" max="25" value="20"
+                                                  style="width: 50px"></p>
+    <p>&nbsp;&nbsp;&nbsp;幾個貪吃蛇高&nbsp;&nbsp;<input id="roomHgtInput" type="number" min="20" max="25" value="20"
+                                                  style="width: 50px"></p>
+    <p>貪吃蛇大小: <input id="snakeSizeInput" type="number" min="20" max="25" value="20" style="width: 50px"></p>
+    <p>食物數量 : <input id="foodNumInput" type="number" min="1" max="3" value="1" style="width: 50px"></p>
+    <p>密碼: <input id="passwordInput" type="text" min="4" style="width: 50px;"></p>
+</div>
+
+
+<!-- 輸入綽號的面板 -->
+<div id="nickNamePanel" style="display: none;">
+    <p>請輸入你的綽號<input id="nickName" type="text"></p>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
-<script src="https://code.jquery.com/jquery-1.11.1.js"></script>
 <script>
+
+    var socket = io();
+    var roomTable = document.getElementById("roomTable");
+    var roomPanel = document.getElementById("roomPanel");
+    var chatPanel = document.getElementById("chatPanel");
+    var curRoomInfoPanel = document.getElementById("curRoomInfoPanel");
+    var systemMsgDom = $('#systemMsg');
+    var curRoomInfoData = [];
+    var curCapacity = 0;
+    var my_id;
     var objLeng = 20;
+    var nickName = "";
+    socket.emit('get id', {});
+
+    function Room(roomName, roomCapacity, roomWid, roomHgt, snakeSize, password, foodNum) {
+        this.roomName = roomName;
+        this.roomCapacity = roomCapacity;
+        this.roomWid = roomWid;
+        this.roomHgt = roomHgt;
+        this.snakeSize = snakeSize;
+        this.password = password;
+        this.foodNum = foodNum;
+        this.curCapacity = 0;
+    }
+
+    $(function () {
+        var dialog = $("#CreateRoomPanel").dialog(
+            {
+                autoOpen: false,
+                modal: true,
+                // dialogClass: 'no-close',
+                buttons: {
+                    "create room": function () {
+                        const roomNameDom = document.getElementById("roomNameInput");
+                        const roomName = roomNameDom.value;
+                        const roomCapacityDom = document.getElementById("roomCapacityInput");
+                        const roomCapacity = roomCapacityDom.value;
+                        const roomWidDom = document.getElementById("roomWidInput");
+                        const roomWid = roomWidDom.value;
+                        const roomHgtDom = document.getElementById("roomHgtInput");
+                        const roomHgt = roomHgtDom.value;
+                        const snakeSizeDom = document.getElementById("snakeSizeInput");
+                        const snakeSize = snakeSizeDom.value;
+                        const passwordDom = document.getElementById("passwordInput");
+                        const password = passwordDom.value;
+                        const foodNumDom = document.getElementById("foodNumInput");
+                        const foodNum = foodNumDom.value;
+                        if (roomName !== "" && roomCapacity >= 1 && roomWid >= 20 && roomHgt >= 20 && snakeSize >= 20 && roomWid <= 25 && roomHgt <= 25 && snakeSize <= 25 && roomCapacity <= 7 && foodNum >= 1 && foodNum <= 3) {
+                            socket.emit("create room request", {
+                                    room: new Room(roomName, roomCapacity, roomWid, roomHgt, snakeSize, password,foodNum),
+                                    nickName: nickName
+                                }
+                            );
+                            dialog.dialog("close");
+                        } else {
+                            alert("條件錯誤");
+                        }
+                    }
+                },
+                close: function () {
+                    updataRoomList(curRoomInfoData);
+                }
+
+            });
+        $('#openCreateRoomPanelBtn').button().on("click", function () {
+            dialog.dialog("open");
+        });
+        var nickNameDialog = $('#nickNamePanel').dialog(
+            {
+                autoOpen: true,
+                modal: true,
+                dialogClass: 'no-close', // 加入自訂的class
+                buttons: {
+                    "確定": function () {
+                        console.log("click button");
+                        nickName = $('#nickName').val();
+                        if (nickName === "") {
+                            alert("請輸入綽號");
+                        } else {
+                            nickNameDialog.dialog("close");
+                        }
+                    }
+                },
+                close: function () {
+                    console.log("close");
+                    socket.emit('add nickname', {nickName: nickName});
+                }
+            }
+        );
+    });
+    $('#nickName').focus();
+
+    function updataRoomList(data) {
+        roomTable.innerHTML = "        <tr>\n" +
+            "            <td>房間名稱</td>\n" +
+            "            <td>房間最多人數</td>\n" +
+            "            <td>房間目前人數</td>\n" +
+            "            <td>加入</td>\n" +
+            "        </tr>";
+        data.roomInfoList.forEach(function (ele) {
+            let row = document.createElement("tr");
+            let roomNameTd = document.createElement("td");
+            roomNameTd.appendChild(document.createTextNode(ele.roomName));
+            row.appendChild(roomNameTd);
+            let roomMaxCapacity = document.createElement("td");
+            roomMaxCapacity.appendChild(document.createTextNode(ele.roomCapacity));
+            row.appendChild(roomMaxCapacity);
+            let curRoomCapacity = document.createElement("td");
+            curRoomCapacity.appendChild(document.createTextNode(ele.curCapacity));
+            row.appendChild(curRoomCapacity);
+            let joinBtn = document.createElement("button");
+            joinBtn.addEventListener("click", function () {
+                socket.emit("join room request", {roomName: ele.roomName, nickName: nickName});
+            });
+            joinBtn.setAttribute("style", "padding: 5px 10px; width: 80%; height: 60%; margin:  20% 10% 20% 10%;");
+            joinBtn.appendChild(document.createTextNode("join"));
+            row.appendChild(joinBtn);
+            roomTable.appendChild(row);
+        })
+    }
+
+    function appendChatMessage(nickName, msg) {
+        var messagesDOM = $('#messages');
+        messagesDOM.append($('<div>').text(nickName + " : " + msg));
+        messagesDOM.scrollTop(messagesDOM.prop('scrollHeight'));
+        console.log("srcollHeight : " + messagesDOM.prop('scrollHeight'))
+    }
+
+    function leaveRoom() {
+        socket.emit("leave room", {nickName: nickName});
+        deadTF = true; // 一離開方間就死掉
+        switchPage();
+    }
+
+    function switchPage() {
+        console.log(roomPanel.style.display);
+        if (roomPanel.style.display === "flex") {
+            roomPanel.style.display = "none";
+            chatPanel.style.display = "block";
+            curRoomInfoPanel.style.display = "block";
+            canvas.style.display = "block";
+        } else {
+            roomPanel.style.display = "flex";
+            chatPanel.style.display = "none";
+            curRoomInfoPanel.style.display = "none";
+            canvas.style.display = "none";
+        }
+
+    }
+
+    function appendNickNameAndColor(data) {
+        let li = document.createElement("li");
+        li.setAttribute("style", "display: flex;flex-direction: row; align-items: center");
+        let divNickName = document.createElement("div");
+        divNickName.appendChild(document.createTextNode(data.nickName));
+        li.appendChild(divNickName);
+
+        let divColorBlock = document.createElement("div");
+        divColorBlock.setAttribute("style", "width: 30px; height: 30px; margin:3px; background: " + data.color + ";");
+        li.appendChild(divColorBlock);
+        $('#snakeColorAndNickName').append(li);
+    }
+
+    function revive() {
+        socket.emit("revive request", {});
+        $("#reviveBtn").attr('disabled', true);
+    }
+
+
+    socket.on('create room response', function (data) {
+        if (data.success) {
+            alert("房間建立成功");
+            objLeng = data.snakeSize;
+        } else {
+            alert("房間建立失敗，此房間名稱已被使用");
+        }
+    });
+
+    socket.on('room info update', function (data) {
+        curRoomInfoData = data;
+        updataRoomList(curRoomInfoData);
+    });
+    socket.on("join room response", function (data) {
+        if (data.success === true) {
+            alert("加入成功");
+            switchPage();
+            objLeng = data.roomInfo.snakeSize;
+            $('#messages').html("");
+            $('#systemMsg').html("");
+            $('form').unbind();
+            $('form').submit(function (e) {
+                e.preventDefault();
+                appendChatMessage(nickName, $('#m').val());
+                socket.emit('chat message', {roomName: data.roomInfo.roomName, nickName: nickName, msg: $('#m').val()});
+                $('#m').val(' ');
+                return false;
+            });
+            let myCanvasCtx = $("#myCanvas")[0].getContext("2d");
+            myCanvasCtx.canvas.width = data.roomInfo.roomWid * data.roomInfo.snakeSize;
+            myCanvasCtx.canvas.height = data.roomInfo.roomHgt * data.roomInfo.snakeSize;
+            deadTF = false;
+            direction = "none";
+            $('#curRoomName').text("房間名稱 : " + data.roomInfo.roomName);
+            $('#curRoomPeopleNum').text("目前房間人數 : " + data.roomInfo.curCapacity);
+        } else {
+            alert("加入失敗");
+        }
+    });
+    socket.on('type password', function (data) {
+        var password = prompt("type password");
+        socket.emit('join room with password', {password: password, roomName: data.roomName});
+    });
+    socket.on('chat message', function (data) {
+        appendChatMessage(data.nickName, data.msg);
+        console.log("get msg : ", data.msg);
+    });
+    socket.on('add user', function (data) {
+        $('#systemMsg').append($('<li>').text(data.nickName + " is join"));
+        systemMsgDom.scrollTop(systemMsgDom.prop('scrollHeight'));
+        curCapacity = data.curCapacity;
+        $('#curRoomPeopleNum').text("目前房間人數 : " + curCapacity);
+    });
+    socket.on('user exit', function (data) {
+        $('#systemMsg').append($('<li>').text(data.nickName + " is exit"));
+        systemMsgDom.scrollTop(systemMsgDom.prop('scrollHeight'));
+        curCapacity = data.curCapacity;
+        $('#curRoomPeopleNum').text("目前房間人數 : " + curCapacity);
+        clearAndDrawRects(data.snakesPos, data.rectColor);
+        drawFood(data.foodsX, data.foodsY, data.foodNum);
+    });
+    socket.on('update nickname-color list', function (data) {
+        $('#snakeColorAndNickName').html("");
+        data.forEach(function (nickname_color) {
+            appendNickNameAndColor(nickname_color);
+        })
+    });
+    socket.on('add nickname', function () {
+        socket.emit("add nickname", {nickName: nickName});
+    });
+
+    /*  snake game */
+    var moveInterval = 1000;
+
     function clearAndDrawRects(snakesPos, rectColor) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         for (let i = 0; i < snakesPos.length; i++) {
             ctx.fillStyle = rectColor[i];
             for (let j = 0; j < snakesPos[i].rectX.length; j++) {
-                ctx.fillRect(snakesPos[i].rectX[j], snakesPos[i].rectY[j], 20, 20);
+                if (j === snakesPos[i].rectX.length - 1) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = "black";
+                } else {
+                    ctx.shadowBlur = 0;
+                    ctx.shadowColor = "";
+                }
+                ctx.fillRect(snakesPos[i].rectX[j], snakesPos[i].rectY[j], objLeng, objLeng);
             }
         }
     }
-    function drawFood(foodX, foodY) {
-        ctx.fillStyle = "#ff9629";
-        ctx.fillRect(foodX, foodY, objLeng, objLeng);
+
+    function drawFood(foodsX, foodsY, foodNum) {
+        for (let i = 0; i < foodNum; i++) {
+            ctx.beginPath();
+            ctx.arc(foodsX[i] + objLeng / 2, foodsY[i] + objLeng / 2, objLeng / 2, 0, 2 * Math.PI);
+            ctx.fillStyle = "#ff9629";
+            ctx.fill();
+        }
+
     }
 
     function snakeRestart() {
@@ -34,100 +490,99 @@
                     socket.emit("rect move", {id: my_id, direction: direction});
                 }
             }
-        },moveInterval);
+        }, moveInterval);
     }
 
-    var socket = io();
-    var my_id = "";
     var canvas = document.getElementById('myCanvas');
     var ctx = canvas.getContext('2d');
     var deadTF = false;
     var myLength = 1;
     socket.on('new player', function (data) {
-        var myCanvasCtx =  $("#myCanvas")[0].getContext('2d');
+        var myCanvasCtx = $("#myCanvas")[0].getContext('2d');
         myCanvasCtx.canvas.width = data.canvasWid;
         myCanvasCtx.canvas.height = data.canvasHgt;
         clearAndDrawRects(data.snakesPos, data.rectColor);
-        drawFood(data.foodX,data.foodY);
+        drawFood(data.foodsX, data.foodsY, data.foodNum);
     });
-    socket.on("player exit", function (data) {
-        console.log("player exit");
-        clearAndDrawRects(data.snakesPos, data.rectColor);
-    });
-
     socket.on('init', function (data) {
         $('#my-id').text("my id : " + data.id);
-        drawFood(data.foodX,data.foodY);
+        console.log("初始化遊戲介面 : ", data);
+        clearAndDrawRects(data.snakesPos, data.rectColor);
+        drawFood(data.foodsX, data.foodsY, data.foodNum);
         my_id = data.id;
+        console.log("data", data);
+        console.log(data.id);
+        console.log(my_id);
     });
     socket.on("rect move", function (data) {
-        //console.log(data);
-        clearAndDrawRects(data.snakesPos,data.rectColor);
-        drawFood(data.foodX, data.foodY);
+        clearAndDrawRects(data.snakesPos, data.rectColor);
+        drawFood(data.foodsX, data.foodsY, data.foodNum);
     });
     socket.on("you dead", function (data) {
         deadTF = true;
-        clearAndDrawRects(data.snakesPos,data.rectColor);
-        $("#gameState").text("GAME OVER");
+        console.log("i dead !!!");
+        clearAndDrawRects(data.snakesPos, data.rectColor);
+        $('#reviveBtn').attr('disabled', false);
     });
-    socket.on("your length",function (data) {
+    socket.on("revive", function (data) {
+        deadTF = false;
+        direction = "none";
+        clearAndDrawRects(data.snakesPos, data.rectColor);
+        drawFood(data.foodsX, data.foodsY, data.foodNum);
+    });
+    socket.on("your length", function (data) {
         myLength = data.snakeLeng;
     });
+    socket.on("connect_error", function (err) {
+        alert("連線中斷");
+    });
     var direction = "none";
-    var moveInterval = 1000;
     var myTimer = setInterval(function () {
         if (!deadTF) {
             if (direction !== "none") {
                 socket.emit("rect move", {id: my_id, direction: direction});
             }
         }
-    },moveInterval);
-    var changeSpeedTimer = setInterval(function () {
-        if (moveInterval > 700){
-            moveInterval -= 100;
-            clearInterval(myTimer);
-            myTimer = setInterval(function () {
-                if (!deadTF) {
-                    if (direction !== "none") {
-                        socket.emit("rect move", {id: my_id, direction: direction});
-                    }
-                }
-            },moveInterval);
-        }
-        console.log(moveInterval);
-    },1000);
+    }, moveInterval);
     document.addEventListener("keydown", function (event) {
-        if (event.key === "ArrowRight") {
-            //console.log("arrow right");
-            if (myLength === 1 || (direction !== "left" && myLength>1)){
-                snakeRestart();
-                direction = "right";
-                socket.emit("rect move", {id: my_id, direction: direction});
-            }
-        } else if (event.key === "ArrowUp" ) {
-            //console.log("arrow up");
-            if (myLength === 1 || (direction !== "down" && myLength>1)) {
-                snakeRestart();
-                direction = "up";
-                socket.emit("rect move", {id: my_id, direction: direction});
-            }
+        if (deadTF === false) {
+            if (event.key === "ArrowRight") {
+                //console.log("arrow right");
+                if (myLength === 1 || (direction !== "left" && myLength > 1)) {
+                    snakeRestart();
+                    direction = "right";
+                    socket.emit("rect move", {id: my_id, direction: direction});
+                }
+            } else if (event.key === "ArrowUp") {
+                //console.log("arrow up");
+                if (myLength === 1 || (direction !== "down" && myLength > 1)) {
+                    snakeRestart();
+                    direction = "up";
+                    socket.emit("rect move", {id: my_id, direction: direction});
+                }
 
-        } else if (event.key === "ArrowDown") {
-            //console.log("arrow down");
-            if (myLength === 1 || (direction !== "up" && myLength>1)){
-                snakeRestart();
-                direction = "down";
-                socket.emit("rect move", {id: my_id, direction: direction});
-            }
+            } else if (event.key === "ArrowDown") {
+                //console.log("arrow down");
+                if (myLength === 1 || (direction !== "up" && myLength > 1)) {
+                    snakeRestart();
+                    direction = "down";
+                    socket.emit("rect move", {id: my_id, direction: direction});
+                }
 
-        } else if (event.key === "ArrowLeft") {
-            //console.log("arrow left");
-            if (myLength === 1 || (direction !== "right" && myLength>1)){
-                snakeRestart();
-                direction = "left";
-                socket.emit("rect move", {id: my_id, direction: direction});
+            } else if (event.key === "ArrowLeft") {
+                //console.log("arrow left");
+                if (myLength === 1 || (direction !== "right" && myLength > 1)) {
+                    snakeRestart();
+                    direction = "left";
+                    socket.emit("rect move", {id: my_id, direction: direction});
+                }
             }
-
+        }
+        if (event.key === "r"){
+            // 死掉才能復活、正在打字時不能復活 、在大廳時不能復活
+            if (deadTF && document.activeElement.id !== "m" && roomPanel.style.display === "none"){
+                revive();
+            }
         }
     })
 </script>
